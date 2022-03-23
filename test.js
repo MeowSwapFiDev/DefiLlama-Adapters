@@ -111,19 +111,27 @@ const passedFile = path.resolve(process.cwd(), process.argv[2]);
   exportKeys.push(...rootexportKeys)
   exportKeys = Object.keys(exportKeys.reduce((agg, key) => ({...agg, [key]: 1}), {})) // get unique keys
   const unknownKeys = exportKeys.filter(key => !whitelistedExportKeys.includes(key))
-
+  const errorString = '------ ERROR ------';
 
   if (unknownChains.length) {
-    console.log('Unknown chain(s): ', unknownChains.join(', '))
-    console.log('Note: if you think that the chain is correct but missing from our list, please add it to `projects/helper/chains.json` file')
-    
+    console.log(`
+    ${errorString}
+
+    Unknown chain(s): ${unknownChains.join(', ')}
+    Note: if you think that the chain is correct but missing from our list, please add it to 'projects/helper/chains.json' file
+    `)
     process.exit(1);
   }
 
   if (blacklistedKeysFound.length) {
     console.log(`
+    ${errorString}
+
+    Please move the following keys into the chain: ${blacklistedKeysFound.join(', ')}
+
     We have a new adapter export specification now where tvl and other chain specific information are moved inside chain export.
     For example if your protocol is on ethereum and has tvl and pool2, the export file would look like:
+    
         module.exports = {
           methodlogy: '...',
           ethereum: {
@@ -132,7 +140,6 @@ const passedFile = path.resolve(process.cwd(), process.argv[2]);
           }
         }
 
-    Please move the following keys into the chain: ${blacklistedKeysFound.join(', ')}
     `)
 
     process.exit(1);
@@ -140,6 +147,8 @@ const passedFile = path.resolve(process.cwd(), process.argv[2]);
 
   if (unknownKeys.length) {
     console.log(`
+    ${errorString}
+
     Found export keys that were not part of specification: ${unknownKeys.join(', ')}
 
     List of valid keys: ${['', '', ...whitelistedExportKeys].join('\n\t\t\t\t')}
