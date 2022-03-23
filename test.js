@@ -8,6 +8,8 @@ const {
   humanizeNumber,
 } = require("@defillama/sdk/build/computeTVL/humanizeNumber");
 const { util } = require("@defillama/sdk");
+const whitelistedExportKeys = require('./projects/helper/whitelistedExportKeys.json')
+const chainList = require('./projects/helper/chains.json')
 
 async function getLatestBlockRetry(chain) {
   for (let i = 0; i < 5; i++) {
@@ -100,7 +102,54 @@ const passedFile = path.resolve(process.cwd(), process.argv[2]);
   const module = require(passedFile);
   const unixTimestamp = Math.round(Date.now() / 1000) - 60;
   const chainBlocks = {};
-  const chains = Object.keys(module);
+  const blacklistedRootExportKeys = ['tvl', 'staking', 'pool2', 'borrowed', 'treasury'];
+  const chains = Object.keys(module).filter(item => typeof module[item] === 'object' && item !== 'hallmarks');
+  const rootexportKeys = Object.keys(module).filter(item => typeof module[item] !== 'object');
+  const unknownChains = chains.filter(chain => !chainList.includes(chain));
+  const blacklistedKeysFound = rootexportKeys.filter(key => blacklistedRootExportKeys.includes(key));
+  let exportKeys = chains.map(chain => Object.keys(module[chain])).flat()
+  exportKeys.push(...rootexportKeys)
+  exportKeys = Object.keys(exportKeys.reduce((agg, key) => ({...agg, [key]: 1}), {})) // get unique keys
+  const unknownKeys = exportKeys.filter(key => !whitelistedExportKeys.includes(key))
+
+
+  if (unknownChains.length) {
+    console.log('Unknown chain(s): ', unknownChains.join(', '))
+    console.log('Note: if you think that the chain is correct but missing from our list, please add it to `projects/helper/chains.json` file')
+    
+    process.exit(1);
+  }
+
+  if (blacklistedKeysFound.length) {
+    console.log(`
+    We have a new adapter export specification now where tvl and other chain specific information are moved inside chain export.
+    For example if your protocol is on ethereum and has tvl and pool2, the export file would look like:
+        module.exports = {
+          methodlogy: '...',
+          ethereum: {
+            tvl: 
+            pool2:
+          }
+        }
+
+    Please move the following keys into the chain: ${blacklistedKeysFound.join(', ')}
+    `)
+
+    process.exit(1);
+  }
+
+  if (unknownKeys.length) {
+    console.log(`
+    Found export keys that were not part of specification: ${unknownKeys.join(', ')}
+
+    List of valid keys: ${['', '', ...whitelistedExportKeys].join('\n\t\t\t\t')}
+    `)
+
+    process.exit(1)
+  }
+
+  
+
   if (!chains.includes("ethereum")) {
     chains.push("ethereum");
   }
